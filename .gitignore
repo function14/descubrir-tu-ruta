@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.env
+.env.*
+.vercel/
+web/public/config.js
+
+# El estado de Terraform guarda DATABASE_URL en texto plano.
+infra/.terraform/
+infra/*.tfstate*
+infra/*.tfvars

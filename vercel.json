@@ -1,0 +1,6 @@
+{
+  "framework": null,
+  "installCommand": "",
+  "buildCommand": "node web/build.mjs",
+  "outputDirectory": "web/public"
+}

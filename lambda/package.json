@@ -1,0 +1,24 @@
+{
+  "name": "descubrir-tu-ruta-inferencia",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Motor de inferencia del sistema experto Descubrir tu Ruta",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test \"test/*.test.mjs\"",
+    "build": "node scripts/build.mjs",
+    "dev": "node scripts/dev.mjs",
+    "db:cargar": "node scripts/cargar-db.mjs"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^1.2.0"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.15",
+    "esbuild": "^0.28.2",
+    "pg": "^8.23.1"
+  }
+}
