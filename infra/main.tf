@@ -138,12 +138,19 @@ resource "aws_lambda_permission" "api_gateway" {
   source_arn    = "${aws_apigatewayv2_api.se.execution_arn}/*/*"
 }
 
+# La cuenta aloja otros proyectos en producción: sin este filtro, el presupuesto mediría
+# el gasto de todos ellos. Requiere activar la etiqueta Proyecto (ver README).
 resource "aws_budgets_budget" "mensual" {
   name         = "descubrir-tu-ruta"
   budget_type  = "COST"
   limit_amount = "5"
   limit_unit   = "USD"
   time_unit    = "MONTHLY"
+
+  cost_filter {
+    name   = "TagKeyValue"
+    values = ["user:Proyecto$descubrir-tu-ruta"]
+  }
 
   notification {
     comparison_operator        = "GREATER_THAN"

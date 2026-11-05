@@ -115,6 +115,14 @@ terraform apply
 
 `infra/terraform.tfstate` guarda `DATABASE_URL` en texto plano: está en `.gitignore` y no debe subirse.
 
+### Activar la alerta de presupuesto
+
+La cuenta de AWS aloja otros proyectos, así que el presupuesto de $5 solo mide los recursos con la etiqueta `Proyecto=descubrir-tu-ruta`. AWS no deja activar una etiqueta hasta que aparece en facturación (alrededor de 24 horas después del primer uso). Mientras tanto el presupuesto marca $0. Para activarla:
+
+```powershell
+aws ce update-cost-allocation-tags-status --profile descubrir-ruta --region us-east-1 --cost-allocation-tags-status TagKey=Proyecto,Status=Active
+```
+
 ## Retirar los recursos
 
 ```powershell
