@@ -19,7 +19,7 @@
   <main class="contenido">
     <section id="inicio" class="vista inicio">
       <h1>¿A dónde te lleva tu próximo viaje?</h1>
-      <p class="entrada">Responde unas pocas preguntas y un sistema experto te recomienda tres destinos de Colombia, mostrando las reglas que lo llevaron a cada uno.</p>
+      <p class="entrada">Responde unas pocas preguntas y un sistema experto ordena los destinos de Colombia de mayor a menor peso, mostrando las reglas que lo llevaron a cada uno.</p>
       <button class="boton" id="comenzar" type="button">Comenzar</button>
       <svg class="trazo" viewBox="0 0 640 120" aria-hidden="true">
         <path d="M12 92 C 110 8, 190 118, 320 62 S 520 22, 628 70" />
@@ -51,8 +51,8 @@
     </section>
 
     <section id="resultados" class="vista" hidden>
-      <h2 id="resultados-titulo" tabindex="-1">Tus tres destinos</h2>
-      <p class="entrada" id="resultados-mensaje" hidden></p>
+      <h2 id="resultados-titulo" tabindex="-1">Tus destinos</h2>
+      <p class="entrada" id="resultados-mensaje"></p>
       <ol id="lista-destinos" class="destinos"></ol>
       <div class="pie-resultados">
         <p class="traza" id="traza"></p>

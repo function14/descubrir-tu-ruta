@@ -73,6 +73,7 @@ Las claves son los nombres de `variable` y los valores, las etiquetas de `valor`
       "region": "Antioquia",
       "descripcion": "Ciudad con oferta cultural y gastronómica",
       "puntaje": 2,
+      "peso_relativo": 29.27,
       "reglas_exactas": 2,
       "reglas": ["R23", "RC8"],
       "explicacion": [
@@ -89,6 +90,8 @@ Las claves son los nombres de `variable` y los valores, las etiquetas de `valor`
   ]
 }
 ```
+
+`recomendaciones` trae todos los destinos con puntaje mayor que 0, de mayor a menor peso. `peso_relativo` es el puntaje del destino normalizado sobre el total, en porcentaje: expresa compatibilidad relativa, no una probabilidad.
 
 Si ninguna regla coincide, `recomendaciones` llega vacío junto con un `mensaje`.
 

@@ -199,34 +199,61 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 .destinos {
   list-style: none;
-  margin: 28px 0 0;
+  margin: 8px 0 0;
   padding: 0;
   display: grid;
-  gap: 16px;
+  gap: 12px;
 }
 
 .destino {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 4px 18px;
-  padding: 22px 20px;
+  padding: 16px 20px 6px;
   border: 1.5px solid var(--linea);
   border-radius: var(--radio);
   background: var(--tarjeta);
 }
 .destino.primero { border-color: var(--acento); }
 
+.destino-cabecera {
+  display: grid;
+  grid-template-columns: 2.2rem 1fr auto;
+  gap: 0 12px;
+  align-items: center;
+}
+
 .numero {
-  grid-row: span 2;
-  font: 500 2.6rem/1 var(--serif);
+  font: 500 1.9rem/1 var(--serif);
+  font-variant-numeric: tabular-nums;
   color: var(--acento);
 }
 
-.destino h3 { font-size: 1.65rem; overflow-wrap: anywhere; }
+.destino h3 { font-size: 1.4rem; overflow-wrap: anywhere; }
+.destino.primero h3 { font-size: 1.65rem; }
 .region { margin: 2px 0 0; font-size: 0.95rem; color: var(--tinta-suave); }
 
-.cuerpo { grid-column: 1 / -1; margin-top: 10px; }
-.descripcion { margin: 0 0 12px; }
+.peso {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.barra {
+  height: 6px;
+  margin-top: 12px;
+  border-radius: 999px;
+  background: var(--linea);
+  overflow: hidden;
+}
+.barra span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--mar);
+}
+.destino.primero .barra span { background: var(--acento); }
+
+.descripcion { margin: 0 0 10px; }
 
 .metricas {
   display: flex;
@@ -239,7 +266,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .metricas dt { color: var(--tinta-suave); }
 .metricas dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
 
-details { margin-top: 14px; }
+details { margin-top: 4px; }
 summary {
   min-height: 44px;
   display: flex;
@@ -249,7 +276,7 @@ summary {
   color: var(--mar);
 }
 
-.reglas { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 14px; }
+.reglas { list-style: none; margin: 14px 0 12px; padding: 0; display: grid; gap: 14px; }
 .regla { padding-left: 14px; border-left: 3px solid var(--linea); }
 .regla.exacta { border-left-color: var(--bien); }
 

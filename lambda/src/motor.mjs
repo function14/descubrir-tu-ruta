@@ -6,7 +6,6 @@
 //   query(texto, parametros)        -> filas
 //   transaction([[texto, params]])  -> ejecuta todo o nada
 
-export const TOP_N = 3;
 const USUARIO_INVITADO = 1; // Usuario sembrado en 02_conocimiento.sql
 
 export class EntradaInvalida extends Error {
@@ -144,9 +143,8 @@ function ordenarDestinos(db, idConsulta) {
        FROM puntaje_destino p
        JOIN destino d ON d.id_destino = p.id_destino
       WHERE p.id_consulta = $1 AND p.puntaje > 0
-      ORDER BY p.puntaje DESC, p.reglas_exactas DESC, p.nombre
-      LIMIT $2`,
-    [idConsulta, TOP_N],
+      ORDER BY p.puntaje DESC, p.reglas_exactas DESC, p.nombre`,
+    [idConsulta],
   );
 }
 
@@ -229,6 +227,7 @@ export async function recomendar(db, respuestas) {
 
   const reglasPorDestino = agruparPor(reglas, 'id_destino');
   const condicionesPorRegla = agruparPor(condiciones, 'id_regla');
+  const puntajeTotal = ranking.reduce((suma, d) => suma + Number(d.puntaje), 0);
 
   return {
     consulta_id: idConsulta,
@@ -240,6 +239,7 @@ export async function recomendar(db, respuestas) {
         region: destino.region,
         descripcion: destino.descripcion,
         puntaje: redondear(destino.puntaje),
+        peso_relativo: redondear((Number(destino.puntaje) / puntajeTotal) * 100),
         reglas_exactas: Number(destino.reglas_exactas),
         reglas: propias.map((r) =>
           r.exacta ? r.codigo : `${r.codigo} (parcial ${redondear(r.aporte)})`,

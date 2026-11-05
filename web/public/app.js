@@ -17,6 +17,9 @@ const TEXTOS = {
 
 const textoDe = (variable) => TEXTOS[variable] ?? { pregunta: variable, corto: variable };
 
+const formatoPeso = new Intl.NumberFormat('es-CO', { maximumFractionDigits: 1 });
+const formatoPuntaje = new Intl.NumberFormat('es-CO', { maximumFractionDigits: 2 });
+
 const $ = (id) => document.getElementById(id);
 const VISTAS = ['inicio', 'cuestionario', 'cargando', 'error', 'resultados'];
 
@@ -145,7 +148,7 @@ function dibujarRegla({ regla, tipo, aporte, condiciones }) {
   cabecera.append(
     elemento('strong', '', regla),
     elemento('span', '', tipo === 'exacta' ? 'Regla exacta' : 'Regla parcial'),
-    elemento('span', '', `Aporta ${aporte}`),
+    elemento('span', '', `Aporta ${formatoPuntaje.format(aporte)}`),
   );
 
   const lista = elemento('ul', 'condiciones');
@@ -168,17 +171,29 @@ function dato(termino, valor) {
   return par;
 }
 
-function dibujarDestino(destino) {
+function dibujarDestino(destino, pesoMaximo) {
   const tarjeta = elemento('li', destino.posicion === 1 ? 'destino primero' : 'destino');
-  tarjeta.append(
+
+  const nombre = elemento('div');
+  nombre.append(elemento('h3', '', destino.destino), elemento('p', 'region', destino.region));
+
+  const cabecera = elemento('div', 'destino-cabecera');
+  cabecera.append(
     elemento('span', 'numero', destino.posicion),
-    elemento('h3', '', destino.destino),
-    elemento('p', 'region', destino.region),
+    nombre,
+    elemento('p', 'peso', `${formatoPeso.format(destino.peso_relativo)} %`),
   );
+
+  // La barra se escala contra el mayor peso para que las diferencias se distingan.
+  const barra = elemento('div', 'barra');
+  barra.setAttribute('aria-hidden', 'true');
+  const relleno = elemento('span');
+  relleno.style.width = `${(destino.peso_relativo / pesoMaximo) * 100}%`;
+  barra.append(relleno);
 
   const metricas = elemento('dl', 'metricas');
   metricas.append(
-    dato('Puntaje', destino.puntaje),
+    dato('Puntaje', formatoPuntaje.format(destino.puntaje)),
     dato('Reglas exactas', destino.reglas_exactas),
   );
 
@@ -186,21 +201,30 @@ function dibujarDestino(destino) {
   detalle.open = destino.posicion === 1;
   const reglas = elemento('ul', 'reglas');
   reglas.append(...destino.explicacion.map(dibujarRegla));
-  detalle.append(elemento('summary', '', '¿Por qué este destino?'), reglas);
+  detalle.append(
+    elemento('summary', '', '¿Por qué este destino?'),
+    elemento('p', 'descripcion', destino.descripcion),
+    metricas,
+    reglas,
+  );
 
-  const cuerpo = elemento('div', 'cuerpo');
-  cuerpo.append(elemento('p', 'descripcion', destino.descripcion), metricas, detalle);
-  tarjeta.append(cuerpo);
+  tarjeta.append(cabecera, barra, detalle);
   return tarjeta;
+}
+
+function resumen(total) {
+  const destinos = total === 1 ? '1 destino compatible' : `${total} destinos compatibles`;
+  return `${destinos}, de mayor a menor peso. El peso es la compatibilidad relativa de cada destino; entre todos suman 100 %.`;
 }
 
 function dibujarResultados({ consulta_id, recomendaciones, mensaje }) {
   const total = recomendaciones.length;
-  $('resultados-titulo').textContent =
-    total === 3 ? 'Tus tres destinos' : total === 0 ? 'Sin recomendación' : 'Tus destinos';
-  $('resultados-mensaje').hidden = !mensaje;
-  $('resultados-mensaje').textContent = mensaje ?? '';
-  $('lista-destinos').replaceChildren(...recomendaciones.map(dibujarDestino));
+  const pesoMaximo = recomendaciones[0]?.peso_relativo;
+  $('resultados-titulo').textContent = total === 0 ? 'Sin recomendación' : 'Tus destinos';
+  $('resultados-mensaje').textContent = mensaje ?? resumen(total);
+  $('lista-destinos').replaceChildren(
+    ...recomendaciones.map((destino) => dibujarDestino(destino, pesoMaximo)),
+  );
   $('traza').textContent = `Consulta n.º ${consulta_id} registrada`;
   mostrar('resultados');
   $('resultados-titulo').focus();

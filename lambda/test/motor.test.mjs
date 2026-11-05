@@ -40,12 +40,31 @@ describe('inferencia', () => {
   it('resuelve el caso conocido: Medellín con R23 y RC8 exactas', async () => {
     const { recomendaciones } = await recomendar(db, CASO_CONOCIDO);
     const [primero] = recomendaciones;
-    assert.equal(recomendaciones.length, 3);
+    assert.ok(recomendaciones.length > 3);
     assert.equal(primero.destino, 'Medellín');
     assert.equal(primero.posicion, 1);
     assert.equal(primero.reglas_exactas, 2);
     assert.deepEqual(primero.reglas.slice(0, 2), ['R23', 'RC8']);
     assert.equal(primero.puntaje, 2);
+  });
+
+  it('devuelve todos los destinos compatibles, de mayor a menor peso', async () => {
+    const { recomendaciones } = await recomendar(db, CASO_CONOCIDO);
+    const [{ posibles }] = await db.query(
+      'SELECT COUNT(*)::int AS posibles FROM puntaje_destino WHERE id_consulta = 1 AND puntaje > 0',
+    );
+    assert.equal(recomendaciones.length, posibles);
+
+    recomendaciones.forEach((destino, indice) => {
+      assert.equal(destino.posicion, indice + 1);
+      assert.ok(destino.peso_relativo > 0);
+      if (indice > 0) {
+        assert.ok(destino.peso_relativo <= recomendaciones[indice - 1].peso_relativo);
+      }
+    });
+
+    const suma = recomendaciones.reduce((total, d) => total + d.peso_relativo, 0);
+    assert.ok(Math.abs(suma - 100) < 0.5, `los pesos suman ${suma}`);
   });
 
   it('calcula el aporte parcial como 0.5 × cumplidas / totales', async () => {
@@ -93,7 +112,7 @@ describe('inferencia', () => {
       [consulta_id],
     );
     assert.equal(hechos, 4);
-    assert.equal(top, 3);
+    assert.equal(top, recomendaciones.length);
     assert.equal(reglas, recomendaciones.reduce((n, d) => n + d.reglas.length, 0));
   });
 

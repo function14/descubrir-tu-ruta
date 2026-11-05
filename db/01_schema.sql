@@ -70,7 +70,7 @@ CREATE TABLE respuesta_usuario (  -- hechos
 );
 CREATE TABLE recomendacion (
   id_consulta INTEGER NOT NULL REFERENCES consulta(id_consulta),
-  posicion    INTEGER NOT NULL CHECK (posicion BETWEEN 1 AND 3),
+  posicion    INTEGER NOT NULL CHECK (posicion >= 1),
   id_destino  INTEGER NOT NULL REFERENCES destino(id_destino),
   puntaje     DECIMAL(6,2) NOT NULL,
   PRIMARY KEY (id_consulta, posicion)
