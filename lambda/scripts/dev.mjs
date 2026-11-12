@@ -1,13 +1,16 @@
 // Entorno local sin cuentas: API real sobre PGlite + interfaz web en un solo puerto.
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
-import { extname, join, normalize, sep } from 'node:path';
+import { extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { crearManejador } from '../src/api.mjs';
 import { crearBase } from '../test/ayuda.mjs';
 
 const PUERTO = Number(process.env.PORT ?? 8787);
-const WEB = fileURLToPath(new URL('../../web/public/', import.meta.url));
+// WEB_DIR permite probar otra versión de la interfaz (p. ej. web/prototipo-rosa).
+const WEB = process.env.WEB_DIR
+  ? join(resolve(process.env.WEB_DIR), sep)
+  : fileURLToPath(new URL('../../web/public/', import.meta.url));
 const TIPOS = {
   '.html': 'text/html; charset=utf-8',
   '.css': 'text/css; charset=utf-8',

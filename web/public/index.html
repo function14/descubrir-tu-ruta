@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Descubrir tu Ruta</title>
-  <meta name="description" content="Sistema experto que recomienda destinos turísticos de Colombia según tu tipo de viaje y explica por qué.">
+  <meta name="description" content="Sistema experto que ordena los destinos turísticos de Colombia según tu tipo de viaje y explica por qué.">
   <link rel="icon" href="icono.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -13,7 +13,10 @@
 </head>
 <body>
   <header class="cabecera">
-    <button class="marca" id="marca" type="button">Descubrir tu Ruta</button>
+    <button class="marca" id="marca" type="button">
+      <span class="marca-punto" aria-hidden="true"></span>
+      Descubrir tu Ruta
+    </button>
   </header>
 
   <main class="contenido">
@@ -21,12 +24,7 @@
       <h1>¿A dónde te lleva tu próximo viaje?</h1>
       <p class="entrada">Responde unas pocas preguntas y un sistema experto ordena los destinos de Colombia de mayor a menor peso, mostrando las reglas que lo llevaron a cada uno.</p>
       <button class="boton" id="comenzar" type="button">Comenzar</button>
-      <svg class="trazo" viewBox="0 0 640 120" aria-hidden="true">
-        <path d="M12 92 C 110 8, 190 118, 320 62 S 520 22, 628 70" />
-        <circle cx="12" cy="92" r="7" />
-        <circle cx="320" cy="62" r="7" />
-        <circle cx="628" cy="70" r="7" />
-      </svg>
+      <ol class="ruta-portada" id="ruta-portada" aria-hidden="true"></ol>
     </section>
 
     <section id="cuestionario" class="vista" hidden>
