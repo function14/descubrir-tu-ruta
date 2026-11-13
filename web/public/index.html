@@ -17,14 +17,50 @@
       <span class="marca-punto" aria-hidden="true"></span>
       Descubrir tu Ruta
     </button>
+    <button class="enlace-cabecera" id="ir-historial" type="button">Mis consultas</button>
   </header>
 
   <main class="contenido">
     <section id="inicio" class="vista inicio">
       <h1>¿A dónde te lleva tu próximo viaje?</h1>
       <p class="entrada">Responde unas pocas preguntas y un sistema experto ordena los destinos de Colombia de mayor a menor peso, mostrando las reglas que lo llevaron a cada uno.</p>
-      <button class="boton" id="comenzar" type="button">Comenzar</button>
+      <div class="acciones">
+        <button class="boton" id="comenzar" type="button">Comenzar</button>
+        <button class="boton secundario" id="ver-consultas" type="button">Ver mis consultas</button>
+      </div>
       <ol class="ruta-portada" id="ruta-portada" aria-hidden="true"></ol>
+    </section>
+
+    <section id="datos" class="vista" hidden>
+      <p class="parada">Antes de empezar</p>
+      <h2 id="datos-titulo" tabindex="-1">¿A nombre de quién guardamos esta ruta?</h2>
+      <p class="entrada">Con tu teléfono y tu primer apellido podrás volver a ver esta consulta cuando quieras.</p>
+      <form id="form-datos" class="formulario" novalidate>
+        <div class="campo">
+          <label for="nombres">Nombres</label>
+          <input id="nombres" name="nombres" autocomplete="given-name" maxlength="60" aria-describedby="nombres-error" required>
+          <p class="campo-error" id="nombres-error"></p>
+        </div>
+        <div class="campo">
+          <label for="apellidos">Apellidos</label>
+          <input id="apellidos" name="apellidos" autocomplete="family-name" maxlength="60" aria-describedby="apellidos-error" required>
+          <p class="campo-error" id="apellidos-error"></p>
+        </div>
+        <div class="campo">
+          <label for="telefono">Teléfono</label>
+          <input id="telefono" name="telefono" type="tel" inputmode="tel" autocomplete="tel-national" maxlength="20" placeholder="300 123 4567" aria-describedby="telefono-ayuda telefono-error" required>
+          <p class="campo-ayuda" id="telefono-ayuda">Celular o fijo de Colombia, 10 dígitos.</p>
+          <p class="campo-error" id="telefono-error"></p>
+        </div>
+        <div class="campo">
+          <label class="autoriza">
+            <input type="checkbox" id="autoriza" aria-describedby="autoriza-error" required>
+            <span>Autorizo guardar mis nombres, apellidos y teléfono con esta consulta, solo para poder consultarla después.</span>
+          </label>
+          <p class="campo-error" id="autoriza-error"></p>
+        </div>
+        <button class="boton" type="submit">Continuar</button>
+      </form>
     </section>
 
     <section id="cuestionario" class="vista" hidden>
@@ -51,11 +87,35 @@
     <section id="resultados" class="vista" hidden>
       <h2 id="resultados-titulo" tabindex="-1">Tus destinos</h2>
       <p class="entrada" id="resultados-mensaje"></p>
+      <ol id="resultados-ruta" class="ruta" aria-label="Respuestas de esta consulta"></ol>
       <ol id="lista-destinos" class="destinos"></ol>
       <div class="pie-resultados">
         <p class="traza" id="traza"></p>
-        <button class="boton" id="otra-vez" type="button">Hacer otra consulta</button>
+        <div class="acciones">
+          <button class="boton secundario" id="volver-historial" type="button" hidden>Volver a mis consultas</button>
+          <button class="boton" id="otra-vez" type="button">Hacer otra consulta</button>
+        </div>
       </div>
+    </section>
+
+    <section id="historial" class="vista" hidden>
+      <h2 id="historial-titulo" tabindex="-1">Mis consultas</h2>
+      <p class="entrada">Escribe el teléfono y el primer apellido con los que guardaste tus rutas.</p>
+      <form id="form-buscar" class="formulario busqueda" novalidate>
+        <div class="campo">
+          <label for="buscar-telefono">Teléfono</label>
+          <input id="buscar-telefono" type="tel" inputmode="tel" autocomplete="tel-national" maxlength="20" placeholder="300 123 4567" aria-describedby="buscar-telefono-error" required>
+          <p class="campo-error" id="buscar-telefono-error"></p>
+        </div>
+        <div class="campo">
+          <label for="buscar-apellidos">Primer apellido</label>
+          <input id="buscar-apellidos" autocomplete="family-name" maxlength="60" aria-describedby="buscar-apellidos-error" required>
+          <p class="campo-error" id="buscar-apellidos-error"></p>
+        </div>
+        <button class="boton" id="buscar-boton" type="submit">Buscar</button>
+      </form>
+      <p class="historial-estado" id="historial-estado" role="status"></p>
+      <ol id="lista-consultas" class="consultas"></ol>
     </section>
   </main>
 

@@ -45,6 +45,7 @@ const FIGURAS = {
   brote: '<path d="M12 21V11"/><path d="M12 11c0-4-3-6-7-6 0 4 3 6 7 6zM12 13.5c0-3.5 2.5-5.5 7-5.5 0 4-3 5.5-7 5.5z"/>',
   prohibido: '<circle cx="12" cy="12" r="8.5"/><path d="m6 6 12 12"/>',
   destello: '<path d="m12 3 1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/>',
+  reloj: '<path d="M3.5 12a8.5 8.5 0 1 0 2.5-6L3.5 8.5"/><path d="M3.5 4v4.5H8M12 7.5V12l3 2"/>',
   check: '<path d="M5 13l4 4L19 7"/>',
   equis: '<path d="M6 6l12 12M18 6 6 18"/>',
 };
@@ -100,13 +101,49 @@ const textoDe = (variable) => TEXTOS[variable] ?? { pregunta: variable, corto: v
 
 const formatoPeso = new Intl.NumberFormat('es-CO', { maximumFractionDigits: 1 });
 const formatoPuntaje = new Intl.NumberFormat('es-CO', { maximumFractionDigits: 2 });
+const formatoFecha = new Intl.DateTimeFormat('es-CO', { dateStyle: 'long', timeStyle: 'short' });
 
 const $ = (id) => document.getElementById(id);
-const VISTAS = ['inicio', 'cuestionario', 'cargando', 'error', 'resultados'];
+const VISTAS = ['inicio', 'datos', 'cuestionario', 'cargando', 'error', 'resultados', 'historial'];
 
 let respuestas = {};
 let reintento = null;
 let turno = 0; // Descarta respuestas de una petición que ya quedó obsoleta.
+// Datos personales solo en memoria: no se guardan en el navegador, que puede ser compartido.
+let viajero = null; // Quien hace la consulta en curso.
+let busqueda = null; // Teléfono y apellido de la última búsqueda en "Mis consultas".
+
+// ---------- Validación de datos (la API repite estas reglas y es la que decide) ----------
+const PATRON_NOMBRE = /^\p{L}[\p{L}\p{M}' .-]*$/u;
+const limpiar = (texto) => texto.normalize('NFC').trim().replace(/\s+/g, ' ');
+
+function normalizarTelefono(texto) {
+  let digitos = texto.replace(/[\s().-]/g, '');
+  if (digitos.startsWith('+57')) digitos = digitos.slice(3);
+  else if (/^57\d{10}$/.test(digitos)) digitos = digitos.slice(2);
+  return /^(3\d{9}|60\d{8})$/.test(digitos) ? digitos : null;
+}
+
+function errorNombre(texto, campo) {
+  if (texto.length < 2) return `Escribe tus ${campo}.`;
+  if (!PATRON_NOMBRE.test(texto)) return 'Usa solo letras, espacios, guiones o apóstrofos.';
+  return '';
+}
+
+const errorTelefono = (texto) =>
+  normalizarTelefono(texto) ? '' : 'Escribe un número de Colombia de 10 dígitos, por ejemplo 300 123 4567.';
+
+// Marca cada campo con su error (o lo limpia) y lleva el foco al primero que falle.
+function validarCampos(revisiones) {
+  let primero = null;
+  for (const [id, mensaje] of revisiones) {
+    $(`${id}-error`).textContent = mensaje;
+    $(id).setAttribute('aria-invalid', String(Boolean(mensaje)));
+    if (mensaje && !primero) primero = id;
+  }
+  if (primero) $(primero).focus();
+  return !primero;
+}
 
 function mostrar(vista) {
   for (const id of VISTAS) $(id).hidden = id !== vista;
@@ -133,19 +170,26 @@ function iconoDe(variable, valor, tamano) {
   return icono(figura, tono, tamano);
 }
 
-async function pedir(ruta, opciones) {
+async function pedir(ruta, cuerpo) {
+  const opciones = cuerpo && {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(cuerpo),
+  };
   const respuesta = await fetch(`${API_URL}${ruta}`, opciones);
   if (!respuesta.ok) {
-    const cuerpo = await respuesta.json().catch(() => ({}));
-    throw new Error(cuerpo.detalles?.join(' ') ?? 'El servicio respondió con un error.');
+    const error = await respuesta.json().catch(() => ({}));
+    throw new Error(error.detalles?.join(' ') ?? 'El servicio respondió con un error.');
   }
   return respuesta.json();
 }
 
+const mensajeDeError = (error) =>
+  error instanceof TypeError ? 'No se pudo conectar con el servicio.' : error.message;
+
 function fallar(error, accion) {
   console.error(error);
-  $('error-texto').textContent =
-    error instanceof TypeError ? 'No se pudo conectar con el servicio.' : error.message;
+  $('error-texto').textContent = mensajeDeError(error);
   reintento = accion;
   mostrar('error');
 }
@@ -160,15 +204,47 @@ function dibujarPortada() {
   );
 }
 
+function paradasDe(respuestasDadas) {
+  return Object.entries(respuestasDadas).map(([variable, valor]) => {
+    const parada = elemento('li');
+    parada.title = textoDe(variable).corto;
+    parada.append(iconoDe(variable, valor, 'chico'), elemento('span', '', valor));
+    return parada;
+  });
+}
+
 function dibujarRuta() {
-  $('ruta').replaceChildren(
-    ...Object.entries(respuestas).map(([variable, valor]) => {
-      const parada = elemento('li');
-      parada.title = textoDe(variable).corto;
-      parada.append(iconoDe(variable, valor, 'chico'), elemento('span', '', valor));
-      return parada;
-    }),
-  );
+  $('ruta').replaceChildren(...paradasDe(respuestas));
+}
+
+// ---------- Datos del viajero ----------
+function mostrarDatos() {
+  turno++;
+  if (viajero) {
+    $('nombres').value = viajero.nombres;
+    $('apellidos').value = viajero.apellidos;
+    $('telefono').value = viajero.telefono;
+    $('autoriza').checked = true;
+  }
+  mostrar('datos');
+  $('datos-titulo').focus();
+}
+
+function guardarDatos(evento) {
+  evento.preventDefault();
+  const nombres = limpiar($('nombres').value);
+  const apellidos = limpiar($('apellidos').value);
+  const telefono = $('telefono').value;
+  const validos = validarCampos([
+    ['nombres', errorNombre(nombres, 'nombres')],
+    ['apellidos', errorNombre(apellidos, 'apellidos')],
+    ['telefono', errorTelefono(telefono)],
+    ['autoriza', $('autoriza').checked ? '' : 'Necesitamos tu autorización para guardar la consulta a tu nombre.'],
+  ]);
+  if (!validos) return;
+  viajero = { nombres, apellidos, telefono: normalizarTelefono(telefono), autoriza_datos: true };
+  respuestas = {};
+  avanzar();
 }
 
 function dibujarPregunta({ variable, valores }) {
@@ -184,7 +260,8 @@ function dibujarPregunta({ variable, valores }) {
       return opcion;
     }),
   );
-  $('atras').hidden = numero === 1;
+  $('atras').hidden = false;
+  $('atras').textContent = numero === 1 ? 'Volver a tus datos' : 'Volver a la pregunta anterior';
   dibujarRuta();
   mostrar('cuestionario');
   $('pregunta').focus();
@@ -212,6 +289,10 @@ function responder(variable, valor) {
 
 function deshacer() {
   const claves = Object.keys(respuestas);
+  if (claves.length === 0) {
+    mostrarDatos();
+    return;
+  }
   respuestas = Object.fromEntries(
     claves.slice(0, -1).map((clave) => [clave, respuestas[clave]]),
   );
@@ -222,12 +303,14 @@ async function recomendar(miTurno = ++turno) {
   $('cargando-texto').textContent = 'Evaluando las reglas del sistema experto…';
   mostrar('cargando');
   try {
-    const resultado = await pedir('/recomendar', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(respuestas),
+    const resultado = await pedir('/recomendar', { viajero, respuestas });
+    if (miTurno !== turno) return;
+    dibujarResultados({
+      ...resultado,
+      respuestas,
+      nombres: viajero.nombres,
+      apellidos: viajero.apellidos,
     });
-    if (miTurno === turno) dibujarResultados(resultado);
   } catch (error) {
     if (miTurno === turno) fallar(error, () => recomendar());
   }
@@ -308,18 +391,127 @@ function resumen(total) {
   return `${destinos}, de mayor a menor peso. El peso es la compatibilidad relativa de cada destino; entre todos suman 100 %.`;
 }
 
-function dibujarResultados({ consulta_id, recomendaciones, mensaje }) {
+// Sirve para una consulta recién hecha y para una recuperada de "Mis consultas"
+// (esta trae su fecha).
+function dibujarResultados(consulta, { desdeHistorial = false } = {}) {
+  const { consulta_id, recomendaciones, mensaje, nombres, apellidos, fecha } = consulta;
   const total = recomendaciones.length;
   const pesoMaximo = recomendaciones[0]?.peso_relativo;
-  $('resultados-titulo').textContent = total === 0 ? 'Sin recomendación' : 'Tus destinos';
+  const nombre = `${nombres} ${apellidos}`;
+
+  let titulo = 'Tus destinos';
+  if (total === 0) titulo = 'Sin recomendación';
+  else if (desdeHistorial) titulo = `Ruta de ${nombre}`;
+  $('resultados-titulo').textContent = titulo;
   $('resultados-mensaje').textContent = mensaje ?? resumen(total);
+  $('resultados-ruta').replaceChildren(...paradasDe(consulta.respuestas));
   $('lista-destinos').replaceChildren(
     ...recomendaciones.map((destino) => dibujarDestino(destino, pesoMaximo)),
   );
-  $('traza').textContent = `Consulta n.º ${consulta_id} registrada`;
+  $('traza').textContent = fecha
+    ? `Consulta n.º ${consulta_id} de ${nombre}, del ${formatoFecha.format(new Date(fecha))}`
+    : `Consulta n.º ${consulta_id} guardada a nombre de ${nombre}`;
+  $('volver-historial').hidden = !desdeHistorial;
   mostrar('resultados');
   $('resultados-titulo').focus();
   window.scrollTo({ top: 0 });
+}
+
+// ---------- Mis consultas ----------
+function mostrarHistorial({ buscarAhora }) {
+  turno++;
+  const conocidos = busqueda ?? viajero;
+  if (buscarAhora && conocidos) {
+    $('buscar-telefono').value = conocidos.telefono;
+    $('buscar-apellidos').value = conocidos.apellidos.split(' ')[0];
+  }
+  mostrar('historial');
+  $('historial-titulo').focus();
+  if (buscarAhora && conocidos) buscar();
+}
+
+async function buscar(evento) {
+  evento?.preventDefault();
+  const telefono = $('buscar-telefono').value;
+  const apellidos = limpiar($('buscar-apellidos').value);
+  const validos = validarCampos([
+    ['buscar-telefono', errorTelefono(telefono)],
+    ['buscar-apellidos', errorNombre(apellidos, 'apellidos')],
+  ]);
+  if (!validos) return;
+
+  const miTurno = ++turno;
+  const datos = { telefono: normalizarTelefono(telefono), apellidos };
+  $('buscar-boton').disabled = true;
+  $('historial-estado').textContent = 'Buscando tus consultas…';
+  $('lista-consultas').replaceChildren();
+  try {
+    const { consultas } = await pedir('/consultas/buscar', datos);
+    if (miTurno !== turno) return;
+    busqueda = datos;
+    dibujarConsultas(consultas);
+  } catch (error) {
+    console.error(error);
+    if (miTurno === turno) $('historial-estado').textContent = mensajeDeError(error);
+  } finally {
+    $('buscar-boton').disabled = false;
+  }
+}
+
+function dibujarConsultas(consultas) {
+  const total = consultas.length;
+  let estado = `Encontramos ${total} consultas, de la más reciente a la más antigua.`;
+  if (total === 0) estado = 'No encontramos consultas con esos datos. Revisa el teléfono y escribe tu primer apellido como lo registraste.';
+  else if (total === 1) estado = 'Encontramos 1 consulta.';
+  $('historial-estado').textContent = estado;
+  $('lista-consultas').replaceChildren(...consultas.map(dibujarConsulta));
+}
+
+function dibujarConsulta(consulta) {
+  const tarjeta = elemento('li', 'consulta');
+  const ruta = elemento('ul', 'ruta');
+  ruta.setAttribute('aria-label', 'Respuestas');
+  ruta.append(...paradasDe(consulta.respuestas));
+
+  const destino = elemento('p', 'consulta-destino');
+  if (consulta.destino_principal) {
+    const compatibles = consulta.total_destinos === 1
+      ? '1 destino compatible'
+      : `${consulta.total_destinos} destinos compatibles`;
+    destino.append(
+      'Primer destino: ',
+      elemento('strong', '', consulta.destino_principal),
+      ` (${formatoPeso.format(consulta.peso_principal)} %) · ${compatibles}`,
+    );
+  } else {
+    destino.textContent = 'Sin recomendación';
+  }
+
+  const ver = elemento('button', 'boton secundario', 'Ver resultados');
+  ver.type = 'button';
+  ver.setAttribute('aria-label', `Ver resultados de la consulta n.º ${consulta.consulta_id}`);
+  ver.addEventListener('click', () => abrirConsulta(consulta.consulta_id));
+
+  tarjeta.append(
+    elemento('h3', '', `Ruta de ${consulta.nombres} ${consulta.apellidos}`),
+    elemento('p', 'consulta-fecha', `${formatoFecha.format(new Date(consulta.fecha))} · Consulta n.º ${consulta.consulta_id}`),
+    ruta,
+    destino,
+    ver,
+  );
+  return tarjeta;
+}
+
+async function abrirConsulta(id) {
+  const miTurno = ++turno;
+  $('cargando-texto').textContent = 'Recuperando la consulta…';
+  mostrar('cargando');
+  try {
+    const detalle = await pedir('/consultas/detalle', { ...busqueda, consulta_id: id });
+    if (miTurno === turno) dibujarResultados(detalle, { desdeHistorial: true });
+  } catch (error) {
+    if (miTurno === turno) fallar(error, () => abrirConsulta(id));
+  }
 }
 
 function reiniciar() {
@@ -329,8 +521,14 @@ function reiniciar() {
 }
 
 dibujarPortada();
-$('comenzar').addEventListener('click', avanzar);
+$('ir-historial').prepend(icono('reloj', 'lavanda', 'chico'));
+$('comenzar').addEventListener('click', mostrarDatos);
+$('form-datos').addEventListener('submit', guardarDatos);
 $('atras').addEventListener('click', deshacer);
 $('reintentar').addEventListener('click', () => reintento?.());
 $('otra-vez').addEventListener('click', reiniciar);
 $('marca').addEventListener('click', reiniciar);
+$('ir-historial').addEventListener('click', () => mostrarHistorial({ buscarAhora: true }));
+$('ver-consultas').addEventListener('click', () => mostrarHistorial({ buscarAhora: true }));
+$('volver-historial').addEventListener('click', () => mostrarHistorial({ buscarAhora: false }));
+$('form-buscar').addEventListener('submit', buscar);

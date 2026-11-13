@@ -6,16 +6,15 @@
 //   query(texto, parametros)        -> filas
 //   transaction([[texto, params]])  -> ejecuta todo o nada
 
+import { EntradaInvalida } from './errores.mjs';
+import { validarViajero } from './viajero.mjs';
+
+export { EntradaInvalida };
+
 const USUARIO_INVITADO = 1; // Usuario sembrado en 02_conocimiento.sql
+const SIN_RECOMENDACION = 'Ninguna regla coincide con estas respuestas; no hay una recomendación fiable.';
 
-export class EntradaInvalida extends Error {
-  constructor(detalles) {
-    super('Entrada inválida');
-    this.detalles = detalles;
-  }
-}
-
-const redondear = (n) => Math.round(Number(n) * 100) / 100;
+export const redondear = (n) => Math.round(Number(n) * 100) / 100;
 
 async function cargarVocabulario(db) {
   const filas = await db.query(
@@ -37,7 +36,7 @@ async function cargarVocabulario(db) {
 // Traduce las respuestas a hechos (ids), rechazando lo que no exista en la base.
 function validar(respuestas, vocabulario, { exigirRespuestas }) {
   if (respuestas === null || typeof respuestas !== 'object' || Array.isArray(respuestas)) {
-    throw new EntradaInvalida(['El cuerpo debe ser un objeto JSON con las respuestas.']);
+    throw new EntradaInvalida(['Las respuestas deben ser un objeto JSON con una clave por variable.']);
   }
   const entradas = Object.entries(respuestas);
   if (exigirRespuestas && entradas.length === 0) {
@@ -115,15 +114,16 @@ export async function siguientePregunta(db, respuestas) {
   };
 }
 
-async function registrarHechos(db, hechos) {
+async function registrarHechos(db, viajero, hechos) {
   const [{ id }] = await db.query(
     `SELECT nextval(pg_get_serial_sequence('consulta', 'id_consulta')) AS id`,
   );
   const idConsulta = Number(id);
   await db.transaction([
     [
-      'INSERT INTO consulta (id_consulta, id_usuario) VALUES ($1::int, $2::int)',
-      [idConsulta, USUARIO_INVITADO],
+      `INSERT INTO consulta (id_consulta, id_usuario, nombres, apellidos, telefono)
+       VALUES ($1::int, $2::int, $3, $4, $5)`,
+      [idConsulta, USUARIO_INVITADO, viajero.nombres, viajero.apellidos, viajero.telefono],
     ],
     [
       `INSERT INTO respuesta_usuario (id_consulta, id_variable, id_valor)
@@ -206,53 +206,61 @@ function agruparPor(filas, clave) {
   return grupos;
 }
 
-export async function recomendar(db, respuestas) {
-  const vocabulario = await cargarVocabulario(db);
-  const hechos = validar(respuestas, vocabulario, { exigirRespuestas: true });
-
-  const idConsulta = await registrarHechos(db, hechos);
+// Ranking y explicación de una consulta a partir de sus hechos guardados. Sirve
+// tanto para una consulta nueva como para volver a mostrar una anterior: con la
+// misma base de conocimiento, el resultado es idéntico al original.
+export async function explicarConsulta(db, idConsulta) {
   const ranking = await ordenarDestinos(db, idConsulta);
-
   if (ranking.length === 0) {
-    return {
-      consulta_id: idConsulta,
-      recomendaciones: [],
-      mensaje: 'Ninguna regla coincide con estas respuestas; no hay una recomendación fiable.',
-    };
+    return { ranking, reglas: [], resultado: { recomendaciones: [], mensaje: SIN_RECOMENDACION } };
   }
 
   const reglas = await reglasDisparadas(db, idConsulta, ranking.map((d) => d.id_destino));
   const condiciones = await condicionesDeReglas(db, idConsulta, reglas.map((r) => r.id_regla));
-  await guardarRecomendacion(db, idConsulta, ranking, reglas);
 
   const reglasPorDestino = agruparPor(reglas, 'id_destino');
   const condicionesPorRegla = agruparPor(condiciones, 'id_regla');
   const puntajeTotal = ranking.reduce((suma, d) => suma + Number(d.puntaje), 0);
 
-  return {
-    consulta_id: idConsulta,
-    recomendaciones: ranking.map((destino, indice) => {
-      const propias = reglasPorDestino.get(destino.id_destino) ?? [];
-      return {
-        posicion: indice + 1,
-        destino: destino.nombre,
-        region: destino.region,
-        descripcion: destino.descripcion,
-        puntaje: redondear(destino.puntaje),
-        peso_relativo: redondear((Number(destino.puntaje) / puntajeTotal) * 100),
-        reglas_exactas: Number(destino.reglas_exactas),
-        reglas: propias.map((r) =>
-          r.exacta ? r.codigo : `${r.codigo} (parcial ${redondear(r.aporte)})`,
+  const recomendaciones = ranking.map((destino, indice) => {
+    const propias = reglasPorDestino.get(destino.id_destino) ?? [];
+    return {
+      posicion: indice + 1,
+      destino: destino.nombre,
+      region: destino.region,
+      descripcion: destino.descripcion,
+      puntaje: redondear(destino.puntaje),
+      peso_relativo: redondear((Number(destino.puntaje) / puntajeTotal) * 100),
+      reglas_exactas: Number(destino.reglas_exactas),
+      reglas: propias.map((r) =>
+        r.exacta ? r.codigo : `${r.codigo} (parcial ${redondear(r.aporte)})`,
+      ),
+      explicacion: propias.map((r) => ({
+        regla: r.codigo,
+        tipo: r.exacta ? 'exacta' : 'parcial',
+        aporte: redondear(r.aporte),
+        condiciones: (condicionesPorRegla.get(r.id_regla) ?? []).map(
+          ({ variable, valor, cumplida }) => ({ variable, valor, cumplida }),
         ),
-        explicacion: propias.map((r) => ({
-          regla: r.codigo,
-          tipo: r.exacta ? 'exacta' : 'parcial',
-          aporte: redondear(r.aporte),
-          condiciones: (condicionesPorRegla.get(r.id_regla) ?? []).map(
-            ({ variable, valor, cumplida }) => ({ variable, valor, cumplida }),
-          ),
-        })),
-      };
-    }),
-  };
+      })),
+    };
+  });
+
+  return { ranking, reglas, resultado: { recomendaciones } };
+}
+
+// Cuerpo esperado: { viajero: { nombres, apellidos, telefono, autoriza_datos }, respuestas }
+export async function recomendar(db, entrada) {
+  if (entrada === null || typeof entrada !== 'object' || Array.isArray(entrada)) {
+    throw new EntradaInvalida(['El cuerpo debe ser un objeto JSON con viajero y respuestas.']);
+  }
+  const viajero = validarViajero(entrada.viajero);
+  const vocabulario = await cargarVocabulario(db);
+  const hechos = validar(entrada.respuestas, vocabulario, { exigirRespuestas: true });
+
+  const idConsulta = await registrarHechos(db, viajero, hechos);
+  const { ranking, reglas, resultado } = await explicarConsulta(db, idConsulta);
+  if (ranking.length > 0) await guardarRecomendacion(db, idConsulta, ranking, reglas);
+
+  return { consulta_id: idConsulta, ...resultado };
 }

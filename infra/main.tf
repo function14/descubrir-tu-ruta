@@ -118,6 +118,20 @@ resource "aws_apigatewayv2_route" "preguntas" {
   target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
 }
 
+# Recuperar consultas anteriores. Son POST para que el teléfono y los apellidos
+# viajen en el cuerpo y no queden en URLs ni en logs de acceso.
+resource "aws_apigatewayv2_route" "consultas_buscar" {
+  api_id    = aws_apigatewayv2_api.se.id
+  route_key = "POST /consultas/buscar"
+  target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+}
+
+resource "aws_apigatewayv2_route" "consultas_detalle" {
+  api_id    = aws_apigatewayv2_api.se.id
+  route_key = "POST /consultas/detalle"
+  target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+}
+
 resource "aws_apigatewayv2_stage" "default" {
   api_id      = aws_apigatewayv2_api.se.id
   name        = "$default"

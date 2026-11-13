@@ -1,7 +1,8 @@
 // Capa HTTP: traduce eventos de API Gateway (payload v2) a llamadas del motor.
+import { buscarConsultas, detalleConsulta } from './consultas.mjs';
 import { EntradaInvalida, recomendar, siguientePregunta } from './motor.mjs';
 
-const MAX_CUERPO_BYTES = 2048; // Ocho respuestas cortas caben de sobra.
+const MAX_CUERPO_BYTES = 2048; // Ocho respuestas cortas y los datos del viajero caben de sobra.
 
 function respuestaJson(status, cuerpo, origen) {
   const headers = { 'content-type': 'application/json; charset=utf-8' };
@@ -27,22 +28,31 @@ export function crearManejador(db, { origenPermitido, registrarError = console.e
   return async function manejar(evento) {
     const metodo = evento.requestContext?.http?.method;
     const ruta = evento.rawPath;
+    const responder = (status, cuerpo) => respuestaJson(status, cuerpo, origenPermitido);
 
     try {
       if (metodo === 'POST' && ruta === '/recomendar') {
-        return respuestaJson(200, await recomendar(db, leerCuerpo(evento)), origenPermitido);
+        return responder(200, await recomendar(db, leerCuerpo(evento)));
       }
       if (metodo === 'GET' && ruta === '/preguntas') {
         const respuestas = evento.queryStringParameters ?? {};
-        return respuestaJson(200, await siguientePregunta(db, respuestas), origenPermitido);
+        return responder(200, await siguientePregunta(db, respuestas));
       }
-      return respuestaJson(404, { error: 'Ruta no encontrada' }, origenPermitido);
+      // Van por POST para que el teléfono y los apellidos no queden en la URL ni en los logs.
+      if (metodo === 'POST' && ruta === '/consultas/buscar') {
+        return responder(200, await buscarConsultas(db, leerCuerpo(evento)));
+      }
+      if (metodo === 'POST' && ruta === '/consultas/detalle') {
+        const detalle = await detalleConsulta(db, leerCuerpo(evento));
+        return detalle ? responder(200, detalle) : responder(404, { error: 'Consulta no encontrada' });
+      }
+      return responder(404, { error: 'Ruta no encontrada' });
     } catch (error) {
       if (error instanceof EntradaInvalida) {
-        return respuestaJson(400, { error: error.message, detalles: error.detalles }, origenPermitido);
+        return responder(400, { error: error.message, detalles: error.detalles });
       }
       registrarError(error);
-      return respuestaJson(500, { error: 'Error interno' }, origenPermitido);
+      return responder(500, { error: 'Error interno' });
     }
   };
 }

@@ -16,7 +16,7 @@ No necesita cuentas: usa la API real sobre PostgreSQL embebido (PGlite).
 ```powershell
 cd lambda
 npm install
-npm test        # 24 pruebas
+npm test        # 46 pruebas
 npm run dev     # http://localhost:8787
 ```
 
@@ -41,14 +41,28 @@ Con `"fin": true` ya no queda nada por preguntar y corresponde llamar a `POST /r
 
 ### `POST /recomendar`
 
-Las claves son los nombres de `variable` y los valores, las etiquetas de `valor`, exactamente como están en la base. Basta una respuesta; un valor que no exista devuelve 400 con los permitidos.
+Cada consulta queda a nombre de quien la hace. `viajero` es obligatorio:
+
+- `nombres` y `apellidos`: de 2 a 60 caracteres. Se aceptan letras, espacios, guiones y apóstrofos.
+- `telefono`: un número de Colombia de 10 dígitos, celular (3…) o fijo (60…). Se aceptan espacios, guiones y el indicativo +57; se guarda solo con los dígitos.
+- `autoriza_datos`: debe ser `true`. Es la autorización para guardar estos datos con la consulta.
+
+En `respuestas`, las claves son los nombres de `variable` y los valores, las etiquetas de `valor`, exactamente como están en la base. Basta una respuesta. Un valor que no exista devuelve 400 con la lista de permitidos.
 
 ```json
 {
-  "tipo_experiencia": "Cultura",
-  "clima": "Templado",
-  "presupuesto": "Medio",
-  "geografia": "Urbano"
+  "viajero": {
+    "nombres": "Ana María",
+    "apellidos": "Gómez Pérez",
+    "telefono": "300 123 4567",
+    "autoriza_datos": true
+  },
+  "respuestas": {
+    "tipo_experiencia": "Cultura",
+    "clima": "Templado",
+    "presupuesto": "Medio",
+    "geografia": "Urbano"
+  }
 }
 ```
 
@@ -95,6 +109,44 @@ Las claves son los nombres de `variable` y los valores, las etiquetas de `valor`
 
 Si ninguna regla coincide, `recomendaciones` llega vacío junto con un `mensaje`.
 
+### `POST /consultas/buscar`
+
+Lista las consultas de una persona, de la más reciente a la más antigua. Exige el teléfono y el primer apellido, o los dos apellidos. No distingue mayúsculas ni tildes.
+
+Una consulta solo aparece si coinciden los dos datos, así que conocer un teléfono no basta para ver a nombre de quién está. Si algo no coincide, la respuesta es igual a la de un teléfono sin consultas.
+
+```json
+{ "telefono": "3001234567", "apellidos": "gomez" }
+```
+```json
+{
+  "consultas": [
+    {
+      "consulta_id": 7,
+      "fecha": "2026-11-12T23:37:05Z",
+      "nombres": "Ana María",
+      "apellidos": "Gómez Pérez",
+      "respuestas": { "tipo_experiencia": "Cultura", "clima": "Templado", "presupuesto": "Medio", "geografia": "Urbano" },
+      "destino_principal": "Medellín",
+      "peso_principal": 29.27,
+      "total_destinos": 18
+    }
+  ]
+}
+```
+
+Las consultas creadas antes de pedir estos datos no tienen nombre y no aparecen.
+
+### `POST /consultas/detalle`
+
+Devuelve una consulta completa, con la misma forma de `POST /recomendar` y además `fecha`, `nombres`, `apellidos` y `respuestas`. El ranking y la explicación se recalculan a partir de los hechos guardados. Mientras la base de conocimiento no cambie, el resultado es idéntico al original.
+
+```json
+{ "telefono": "3001234567", "apellidos": "Gómez", "consulta_id": 7 }
+```
+
+Si la consulta no existe o los datos no coinciden, responde 404.
+
 ## Despliegue
 
 Requiere `DATABASE_URL` (cadena pooled de Neon) y credenciales de AWS.
@@ -103,6 +155,8 @@ Requiere `DATABASE_URL` (cadena pooled de Neon) y credenciales de AWS.
 # 1. Base de conocimiento (se niega a correr si ya está cargada)
 cd lambda
 npm run db:cargar
+#    Una base cargada antes de un cambio de esquema se actualiza con las migraciones
+#    de db/ (04_…, 05_…), en orden. Las instalaciones nuevas no las necesitan.
 
 # 2. Lambda y API Gateway
 npm run build
